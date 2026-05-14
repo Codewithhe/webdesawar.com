@@ -20,6 +20,8 @@ export const RESULTS_REVALIDATE_SECONDS = 30;
 export const RESULTS_CACHE_TAG = "mini-desawar-results";
 
 export const CATEGORY_NAME = process.env.CATEGORY_NAME ?? "Minidesawer";
+export const WHATSAPP_PHONE = "919389187889";
+export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_PHONE}`;
 
 export const OTHER_GAME_PLACEHOLDERS = [
   { name: "Faridabad", time: "06:00 PM" },

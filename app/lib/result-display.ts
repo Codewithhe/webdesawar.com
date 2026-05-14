@@ -1,4 +1,4 @@
-import { CATEGORY_NAME, DEFAULT_RESULT_TIME, OTHER_GAME_PLACEHOLDERS, RESULT_TIME_ZONE } from "./site";
+import { CATEGORY_NAME, DEFAULT_RESULT_TIME, OTHER_GAME_PLACEHOLDERS, RESULT_TIME_ZONE, SITE_NAME } from "./site";
 import type { RecentResultItem, TodayResultItem, WeekResultItem } from "./api";
 
 export type WeekPivotRow = {
@@ -14,6 +14,15 @@ function toText(value: unknown) {
 
 export function normalizeShiftName(value: unknown) {
   return toText(value).toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+export function isMiniDesawarName(name: string | undefined) {
+  const normalized = normalizeShiftName(name);
+
+  return (
+    normalized === normalizeShiftName(CATEGORY_NAME) ||
+    normalized === normalizeShiftName(SITE_NAME)
+  );
 }
 
 export function displayResult(value: unknown) {
@@ -118,6 +127,61 @@ function parseTimestamp(value: string | undefined) {
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 
+export function getIstTodayKey(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: RESULT_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+function resolveTodayResultFromRecent(item: RecentResultItem, todayKey = getIstTodayKey()) {
+  if (item.Date2 === todayKey) {
+    return {
+      resultDate: item.Date2,
+      result: item.Result2 ?? null,
+    };
+  }
+
+  if (item.Date1 === todayKey) {
+    return {
+      resultDate: item.Date1,
+      result: item.Result1 ?? null,
+    };
+  }
+
+  return {
+    resultDate: todayKey,
+    result: null,
+  };
+}
+
+function resolveFeaturedResultFromRecent(item: RecentResultItem, todayKey = getIstTodayKey()) {
+  return resolveTodayResultFromRecent(item, todayKey);
+}
+
+function resolveCardResultFromRecent(item: RecentResultItem) {
+  return {
+    resultDate: item.Date2 ?? item.Date1,
+    result: item.Result2 ?? item.Result1 ?? null,
+  };
+}
+
+function resolveTodayResultFromToday(item: TodayResultItem, todayKey = getIstTodayKey()) {
+  if (item.ResultDate && item.ResultDate !== todayKey) {
+    return {
+      resultDate: todayKey,
+      result: null,
+    };
+  }
+
+  return {
+    resultDate: item.ResultDate ?? todayKey,
+    result: item.Result ?? null,
+  };
+}
+
 export function getLatestTimestamp(
   today: TodayResultItem[],
   recent: RecentResultItem[],
@@ -152,7 +216,7 @@ export function findFeaturedTodayResult(
     return recentMatch;
   }
 
-  return today[0] ?? recent[0] ?? null;
+  return null;
 }
 
 export function getFeaturedResultValue(item: TodayResultItem | RecentResultItem | null) {
@@ -161,11 +225,11 @@ export function getFeaturedResultValue(item: TodayResultItem | RecentResultItem 
   }
 
   if ("ResultDate" in item) {
-    return displayResult(item.Result);
+    return displayResult(resolveTodayResultFromToday(item).result);
   }
 
   const recent = item as RecentResultItem;
-  return displayResult(recent.Result2 ?? recent.Result1);
+  return displayResult(resolveFeaturedResultFromRecent(recent).result);
 }
 
 export function getFeaturedResultDate(item: TodayResultItem | RecentResultItem | null) {
@@ -174,11 +238,11 @@ export function getFeaturedResultDate(item: TodayResultItem | RecentResultItem |
   }
 
   if ("ResultDate" in item) {
-    return item.ResultDate ?? "";
+    return resolveTodayResultFromToday(item).resultDate;
   }
 
   const recent = item as RecentResultItem;
-  return recent.Date2 ?? recent.Date1 ?? "";
+  return resolveFeaturedResultFromRecent(recent).resultDate;
 }
 
 export function getFeaturedResultTime(item: TodayResultItem | RecentResultItem | null) {
@@ -254,16 +318,20 @@ export function buildTodayCardItems(
   }
 
   if (recent.length) {
-    return recent.map((item, index) => ({
-      ResultId: item.ShiftId ? `recent-${item.ShiftId}` : `recent-${index}`,
-      ShiftId: item.ShiftId,
-      ShiftName: item.ShiftName,
-      ShiftResultTime: item.ShiftResultTime,
-      ShiftColor: item.ShiftColor,
-      ResultDate: item.Date2 ?? item.Date1,
-      Result: item.Result2 ?? item.Result1,
-      AddedDate: item.AddDate,
-    }));
+    return recent.map((item, index) => {
+      const cardResult = resolveCardResultFromRecent(item);
+
+      return {
+        ResultId: item.ShiftId ? `recent-${item.ShiftId}` : `recent-${index}`,
+        ShiftId: item.ShiftId,
+        ShiftName: item.ShiftName,
+        ShiftResultTime: item.ShiftResultTime,
+        ShiftColor: item.ShiftColor,
+        ResultDate: cardResult.resultDate,
+        Result: cardResult.result,
+        AddedDate: item.AddDate,
+      };
+    });
   }
 
   return OTHER_GAME_PLACEHOLDERS.map((game, index) => ({
@@ -280,19 +348,22 @@ export function featuredToCardItem(
   siteName: string
 ): TodayResultItem {
   if (featured && "ResultDate" in featured) {
+    const todayResult = resolveTodayResultFromToday(featured);
+
     return {
       ResultId: featured.ResultId ?? "featured",
       ShiftId: featured.ShiftId,
       ShiftName: siteName,
       ShiftResultTime: featured.ShiftResultTime,
       ShiftColor: featured.ShiftColor,
-      ResultDate: featured.ResultDate,
-      Result: featured.Result,
+      ResultDate: todayResult.resultDate,
+      Result: todayResult.result,
     };
   }
 
   if (featured) {
     const recent = featured as RecentResultItem;
+    const todayResult = resolveFeaturedResultFromRecent(recent);
 
     return {
       ResultId: `featured-${recent.ShiftId ?? "0"}`,
@@ -300,8 +371,8 @@ export function featuredToCardItem(
       ShiftName: siteName,
       ShiftResultTime: recent.ShiftResultTime,
       ShiftColor: recent.ShiftColor,
-      ResultDate: recent.Date2 ?? recent.Date1,
-      Result: recent.Result2 ?? recent.Result1,
+      ResultDate: todayResult.resultDate,
+      Result: todayResult.result,
     };
   }
 
@@ -309,6 +380,7 @@ export function featuredToCardItem(
     ResultId: "featured",
     ShiftName: siteName,
     ShiftResultTime: DEFAULT_RESULT_TIME,
+    ResultDate: getIstTodayKey(),
     Result: null,
   };
 }
@@ -319,10 +391,9 @@ export function buildHomeCardItems(
   featured: TodayResultItem | RecentResultItem | null,
   siteName: string
 ): TodayResultItem[] {
-  const configuredName = normalizeShiftName(CATEGORY_NAME);
   const featuredCard = featuredToCardItem(featured, siteName);
   const otherCards = buildTodayCardItems(today, recent).filter(
-    (item) => normalizeShiftName(item.ShiftName) !== configuredName
+    (item) => !isMiniDesawarName(item.ShiftName)
   );
 
   return [featuredCard, ...otherCards];

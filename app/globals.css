@@ -745,14 +745,75 @@ a {
 }
 
 .whatsapp-btn {
-  background: linear-gradient(180deg, #39ef90, #19c86f);
-  border-radius: 999px;
-  box-shadow: 0 8px 18px rgba(25, 200, 111, 0.28);
+  align-items: center;
+  animation: whatsapp-pulse 2.2s ease-in-out infinite;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 42%),
+    linear-gradient(180deg, #45f39a, #18b764 58%, #0f9f56 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 18px;
+  box-shadow: 0 14px 30px rgba(15, 159, 86, 0.28);
   color: #ffffff;
   display: inline-flex;
-  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.75rem;
+  justify-content: center;
+  max-width: 38rem;
+  overflow: hidden;
+  padding: 1rem 1.15rem;
+  position: relative;
+  text-decoration: none;
+  width: min(100%, 38rem);
+}
+
+.whatsapp-btn::before {
+  animation: shine-sweep 2.8s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.24), transparent);
+  content: "";
+  height: 100%;
+  left: -60%;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  transform: skewX(-18deg);
+  width: 40%;
+}
+
+.whatsapp-btn > * {
+  position: relative;
+  z-index: 1;
+}
+
+.whatsapp-btn-icon {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2.5rem;
+  justify-content: center;
+  width: 2.5rem;
+}
+
+.whatsapp-icon {
+  flex: 0 0 auto;
+  height: 1.45rem;
+  width: 1.45rem;
+}
+
+.whatsapp-btn-copy {
+  flex: 1 1 auto;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.whatsapp-btn-arrow {
+  animation: arrow-nudge 1.2s ease-in-out infinite;
+  flex: 0 0 auto;
+  font-size: 1.35rem;
   font-weight: 900;
-  padding: 0.7rem 1.35rem;
+  line-height: 1;
 }
 
 .hero-section h1,
@@ -773,6 +834,10 @@ a {
   color: var(--text-muted);
   font-size: 0.95rem;
   margin-bottom: 1.8rem;
+}
+
+.hero-section .whatsapp-btn {
+  margin-bottom: 1.2rem;
 }
 
 .hero-section {
@@ -1123,6 +1188,11 @@ a {
   font-weight: 900;
 }
 
+.shift-chip.is-mini-desawar-chip {
+  background: linear-gradient(180deg, rgba(255, 176, 92, 0.95), rgba(255, 109, 26, 0.92));
+  color: #ffffff;
+}
+
 .chart-actions {
   align-items: center;
   display: flex;
@@ -1170,6 +1240,30 @@ a {
   50% {
     opacity: 0.45;
     transform: scale(0.96);
+  }
+}
+
+@keyframes arrow-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(0.28rem);
+  }
+}
+
+@keyframes whatsapp-pulse {
+  0%,
+  100% {
+    box-shadow: 0 14px 30px rgba(15, 159, 86, 0.28);
+    transform: translateY(0);
+  }
+
+  50% {
+    box-shadow: 0 18px 36px rgba(15, 159, 86, 0.42);
+    transform: translateY(-1px);
   }
 }
 

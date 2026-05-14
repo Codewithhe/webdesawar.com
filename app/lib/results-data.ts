@@ -2,11 +2,12 @@ import "server-only";
 
 import { fetchLatestResults } from "./api";
 import {
-  findFeaturedTodayResult,
-  getLatestTimestamp,
-  buildWeekPivotRows,
-  type WeekPivotRow,
-} from "./result-display";
+  getMiniDesawarData,
+  mergeRecentWithMiniDesawar,
+  mergeWeekPivotWithMiniDesawar,
+  withoutScrapperMiniDesawarRows,
+} from "./mini-desawar-data";
+import { getLatestTimestamp, buildWeekPivotRows, type WeekPivotRow } from "./result-display";
 import type { RecentResultItem, TodayResultItem, WeekResultItem } from "./api";
 
 type FetchOptions = {
@@ -22,6 +23,7 @@ export type ResultsData = {
   success: boolean;
   cached: boolean;
   today: TodayResultItem[];
+  sourceRecent: RecentResultItem[];
   recent: RecentResultItem[];
   week: WeekResultItem[];
   weekPivot: {
@@ -42,6 +44,7 @@ export async function getResultsData({ bypassCache = false }: FetchOptions = {})
         success: false,
         cached: response.cached,
         today: [],
+        sourceRecent: [],
         recent: [],
         week: [],
         weekPivot: { dates: [], rows: [] },
@@ -55,19 +58,22 @@ export async function getResultsData({ bypassCache = false }: FetchOptions = {})
     }
 
     const buckets = response.data.data;
-    const today = buckets.Today;
-    const recent = buckets.Recent;
+    const today = withoutScrapperMiniDesawarRows(buckets.Today);
+    const sourceRecent = withoutScrapperMiniDesawarRows(buckets.Recent);
     const week = buckets.WeekResult;
+    const weekPivot = buildWeekPivotRows(week);
+    const miniDesawar = await getMiniDesawarData(weekPivot.dates, { bypassCache });
 
     return {
       success: true,
       cached: response.cached,
       today,
-      recent,
+      sourceRecent,
+      recent: mergeRecentWithMiniDesawar(sourceRecent, miniDesawar.recent),
       week,
-      weekPivot: buildWeekPivotRows(week),
-      featured: findFeaturedTodayResult(today, recent),
-      lastUpdated: getLatestTimestamp(today, recent, week),
+      weekPivot: mergeWeekPivotWithMiniDesawar(weekPivot, miniDesawar.week),
+      featured: miniDesawar.featured,
+      lastUpdated: getLatestTimestamp(today, sourceRecent, week),
       status: {
         type: "success",
         message: bypassCache
@@ -80,6 +86,7 @@ export async function getResultsData({ bypassCache = false }: FetchOptions = {})
       success: false,
       cached: false,
       today: [],
+      sourceRecent: [],
       recent: [],
       week: [],
       weekPivot: { dates: [], rows: [] },

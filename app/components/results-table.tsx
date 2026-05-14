@@ -5,9 +5,10 @@ import {
   formatResultTime,
   formatShortDate,
   getRecentDateLabels,
+  isMiniDesawarName,
+  type WeekPivotRow,
 } from "../lib/result-display";
 import type { RecentResultItem } from "../lib/api";
-import type { WeekPivotRow } from "../lib/result-display";
 
 type RecentTableProps = {
   rows: RecentResultItem[];
@@ -52,8 +53,12 @@ export function RecentResultsTable({ rows }: RecentTableProps) {
               <tr key={`${row.ShiftId}-${row.ShiftName}-${row.AddDate}`}>
                 <th scope="row">
                   <span
-                    className="shift-chip"
-                    style={row.ShiftColor ? { backgroundColor: row.ShiftColor } : undefined}
+                    className={`shift-chip${isMiniDesawarName(row.ShiftName) ? " is-mini-desawar-chip" : ""}`}
+                    style={
+                      row.ShiftColor && !isMiniDesawarName(row.ShiftName)
+                        ? { backgroundColor: row.ShiftColor }
+                        : undefined
+                    }
                   >
                     {row.ShiftName}
                   </span>
@@ -91,8 +96,12 @@ export function WeekResultsTable({ dates, rows }: WeekTableProps) {
               <tr key={row.name}>
                 <th scope="row">
                   <span
-                    className="shift-chip"
-                    style={row.color ? { backgroundColor: row.color } : undefined}
+                    className={`shift-chip${isMiniDesawarName(row.name) ? " is-mini-desawar-chip" : ""}`}
+                    style={
+                      row.color && !isMiniDesawarName(row.name)
+                        ? { backgroundColor: row.color }
+                        : undefined
+                    }
                   >
                     {row.name}
                   </span>
