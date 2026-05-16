@@ -63,12 +63,12 @@ function parseGamesFromJson(raw: string) {
   }
 }
 
-function parseGamesFromPipe(raw: string) {
+function parseGamesFromPipe(raw: string): EnvGameCard[] {
   return raw
     .split(",")
     .map((chunk) => chunk.trim())
     .filter(Boolean)
-    .map((chunk) => {
+    .map((chunk): EnvGameCard | null => {
       const [name, result, time] = chunk.split("|").map((part) => part.trim());
 
       if (!name) {
@@ -79,7 +79,7 @@ function parseGamesFromPipe(raw: string) {
         name,
         time: normalizeResultSlotTime(time),
         result: parseEnvResult(result),
-      } satisfies EnvGameCard;
+      };
     })
     .filter((game): game is EnvGameCard => game !== null);
 }
@@ -107,7 +107,7 @@ function parseGamesFromNamedEnv() {
       result: process.env.DISAWAR_RESULT,
     },
   ]
-    .map((game) => {
+    .map((game): EnvGameCard | null => {
       const hasConfig = Boolean(toText(game.time) || toText(game.result));
 
       if (!hasConfig) {
@@ -118,7 +118,7 @@ function parseGamesFromNamedEnv() {
         name: game.name,
         time: normalizeResultSlotTime(game.time || "07:30 PM"),
         result: parseEnvResult(toText(game.result) || "XX"),
-      } satisfies EnvGameCard;
+      };
     })
     .filter((game): game is EnvGameCard => game !== null);
 

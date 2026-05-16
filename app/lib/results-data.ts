@@ -100,6 +100,7 @@ export async function getResultsData({ bypassCache = false }: FetchOptions = {})
     featured: null,
     recent: null,
     week: null,
+    weekDates: [],
   };
 
   try {
