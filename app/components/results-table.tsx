@@ -1,5 +1,6 @@
 "use client";
 
+import { getGameCardLabel } from "../lib/game-display";
 import {
   displayResult,
   formatResultTime,
@@ -56,11 +57,11 @@ export function RecentResultsTable({ rows }: RecentTableProps) {
                     className={`shift-chip${isMiniDesawarName(row.ShiftName) ? " is-mini-desawar-chip" : ""}`}
                     style={
                       row.ShiftColor && !isMiniDesawarName(row.ShiftName)
-                        ? { backgroundColor: row.ShiftColor }
+                        ? { backgroundColor: row.ShiftColor, color: "#ffffff" }
                         : undefined
                     }
                   >
-                    {row.ShiftName}
+                    {getGameCardLabel(row.ShiftName, isMiniDesawarName(row.ShiftName))}
                   </span>
                 </th>
                 <td>{formatResultTime(row.ShiftResultTime)}</td>
@@ -99,11 +100,11 @@ export function WeekResultsTable({ dates, rows }: WeekTableProps) {
                     className={`shift-chip${isMiniDesawarName(row.name) ? " is-mini-desawar-chip" : ""}`}
                     style={
                       row.color && !isMiniDesawarName(row.name)
-                        ? { backgroundColor: row.color }
+                        ? { backgroundColor: row.color, color: "#ffffff" }
                         : undefined
                     }
                   >
-                    {row.name}
+                    {getGameCardLabel(row.name, isMiniDesawarName(row.name))}
                   </span>
                 </th>
                 <td>{formatResultTime(row.time)}</td>

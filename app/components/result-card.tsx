@@ -37,7 +37,7 @@ export default function ResultCard({ item, featured = false }: ResultCardProps) 
         <span className="time-chip">{formatResultTime(item.ShiftResultTime)}</span>
       </div>
       <strong className={isLive ? "result" : "waiting"}>{resultLabel}</strong>
-      <span className={getGameCardLabelClassName(featured)}>{gameName}</span>
+      <span className={getGameCardLabelClassName()}>{gameName}</span>
       <span className="date-badge">{formatShortDate(item.ResultDate)}</span>
     </article>
   );

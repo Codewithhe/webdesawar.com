@@ -1,6 +1,7 @@
 import "server-only";
 
 import { fetchLatestResults } from "./api";
+import { fetchHomeData } from "./home-data";
 import {
   getMiniDesawarData,
   mergeRecentWithMiniDesawar,
@@ -44,12 +45,17 @@ export type ResultsData = {
 
 function buildResultsFromLatest(
   response: Extract<Awaited<ReturnType<typeof fetchLatestResults>>, { success: true }>,
+  homeData: Awaited<ReturnType<typeof fetchHomeData>>,
   miniDesawar: Awaited<ReturnType<typeof getMiniDesawarData>>,
   bypassCache: boolean
 ): ResultsData {
   const buckets = response.data.data;
   const today = withoutScrapperMiniDesawarRows(buckets.Today);
-  const sourceRecent = withoutScrapperMiniDesawarRows(buckets.Recent);
+  const latestRecent = withoutScrapperMiniDesawarRows(buckets.Recent);
+  const sourceRecent =
+    homeData.success && homeData.recent.length > 0
+      ? withoutScrapperMiniDesawarRows(homeData.recent)
+      : latestRecent;
   const week = buckets.WeekResult;
   const weekPivot = buildWeekPivotRows(week);
 
@@ -58,7 +64,7 @@ function buildResultsFromLatest(
     cached: response.cached,
     today,
     sourceRecent,
-    recent: mergeRecentWithMiniDesawar(sourceRecent, miniDesawar.recent),
+    recent: mergeRecentWithMiniDesawar(latestRecent, miniDesawar.recent),
     week,
     weekPivot: mergeWeekPivotWithMiniDesawar(weekPivot, miniDesawar.week),
     featured: miniDesawar.featured ?? findFeaturedTodayResult(buckets.Today, buckets.Recent),
@@ -73,29 +79,43 @@ function buildResultsFromLatest(
   };
 }
 
+function buildResultsFromHomeDataOnly(
+  homeData: Awaited<ReturnType<typeof fetchHomeData>>,
+  miniDesawar: Awaited<ReturnType<typeof getMiniDesawarData>>,
+  bypassCache: boolean
+): ResultsData {
+  const sourceRecent = withoutScrapperMiniDesawarRows(homeData.recent);
+
+  return {
+    success: true,
+    cached: false,
+    today: [],
+    sourceRecent,
+    recent: mergeRecentWithMiniDesawar(sourceRecent, miniDesawar.recent),
+    week: [],
+    weekPivot: mergeWeekPivotWithMiniDesawar({ dates: [], rows: [] }, miniDesawar.week),
+    featured: miniDesawar.featured,
+    envCards: buildEnvGameCardItems(),
+    lastUpdated: homeData.updatedAt,
+    status: {
+      type: "success",
+      message: bypassCache
+        ? "Fresh live results loaded from home data."
+        : "Live results loaded from home data.",
+    },
+  };
+}
+
 export async function getResultsData({ bypassCache = false }: FetchOptions = {}): Promise<ResultsData> {
-  const response = await fetchLatestResults({ bypassCache });
+  const [homeData, response] = await Promise.all([
+    fetchHomeData({ bypassCache }),
+    fetchLatestResults({ bypassCache }),
+  ]);
 
-  if (!response.success) {
-    return {
-      success: false,
-      cached: response.cached,
-      today: [],
-      sourceRecent: [],
-      recent: [],
-      week: [],
-      weekPivot: { dates: [], rows: [] },
-      featured: null,
-      envCards: buildEnvGameCardItems(),
-      lastUpdated: null,
-      status: {
-        type: "error",
-        message: response.message || "Unable to load live results right now.",
-      },
-    };
-  }
+  const weekPivot = response.success
+    ? buildWeekPivotRows(response.data.data.WeekResult)
+    : { dates: [], rows: [] };
 
-  const weekPivot = buildWeekPivotRows(response.data.data.WeekResult);
   let miniDesawar: Awaited<ReturnType<typeof getMiniDesawarData>> = {
     featured: null,
     recent: null,
@@ -106,8 +126,33 @@ export async function getResultsData({ bypassCache = false }: FetchOptions = {})
   try {
     miniDesawar = await getMiniDesawarData(weekPivot.dates, { bypassCache });
   } catch {
-    // Mini backend must not block scrapper /api/latest results from rendering.
+    // Mini backend must not block scrapper results from rendering.
   }
 
-  return buildResultsFromLatest(response, miniDesawar, bypassCache);
+  if (response.success) {
+    return buildResultsFromLatest(response, homeData, miniDesawar, bypassCache);
+  }
+
+  if (homeData.success) {
+    return buildResultsFromHomeDataOnly(homeData, miniDesawar, bypassCache);
+  }
+
+  return {
+    success: false,
+    cached: response.success === false ? response.cached : false,
+    today: [],
+    sourceRecent: [],
+    recent: [],
+    week: [],
+    weekPivot: { dates: [], rows: [] },
+    featured: null,
+    envCards: buildEnvGameCardItems(),
+    lastUpdated: null,
+    status: {
+      type: "error",
+      message:
+        (response.success === false ? response.message : null) ||
+        "Unable to load live results right now.",
+    },
+  };
 }

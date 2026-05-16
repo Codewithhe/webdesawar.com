@@ -136,18 +136,40 @@ export function getIstTodayKey(now = new Date()) {
   }).format(now);
 }
 
-function resolveTodayResultFromRecent(item: RecentResultItem, todayKey = getIstTodayKey()) {
+function previousIsoDate(isoDate: string) {
+  const date = new Date(`${isoDate}T12:00:00+05:30`);
+  date.setDate(date.getDate() - 1);
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: RESULT_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function sanitizeApiCardResult(value: unknown): string | number | null {
+  const text = toText(value);
+
+  if (!text || text.toUpperCase() === "XX") {
+    return null;
+  }
+
+  return value as string | number;
+}
+
+export function resolveTodayResultFromRecent(item: RecentResultItem, todayKey = getIstTodayKey()) {
   if (item.Date2 === todayKey) {
     return {
-      resultDate: item.Date2,
-      result: item.Result2 ?? null,
+      resultDate: todayKey,
+      result: sanitizeApiCardResult(item.Result2),
     };
   }
 
   if (item.Date1 === todayKey) {
     return {
-      resultDate: item.Date1,
-      result: item.Result1 ?? null,
+      resultDate: todayKey,
+      result: sanitizeApiCardResult(item.Result1),
     };
   }
 
@@ -157,28 +179,45 @@ function resolveTodayResultFromRecent(item: RecentResultItem, todayKey = getIstT
   };
 }
 
+export function resolveCardDisplayFromRecent(item: RecentResultItem, todayKey = getIstTodayKey()) {
+  const current = resolveTodayResultFromRecent(item, todayKey);
+
+  let previousDate: string | undefined;
+  let previousResult: string | number | null = null;
+
+  if (current.resultDate === todayKey && item.Date2 === todayKey) {
+    previousDate = item.Date1;
+    previousResult = sanitizeApiCardResult(item.Result1);
+  } else if (current.resultDate === todayKey && item.Date1 === todayKey) {
+    previousDate = previousIsoDate(todayKey);
+    previousResult = null;
+  } else if (item.Date2 && item.Date2 < todayKey) {
+    previousDate = item.Date2;
+    previousResult = sanitizeApiCardResult(item.Result2);
+  } else if (item.Date1 && item.Date1 < todayKey) {
+    previousDate = item.Date1;
+    previousResult = sanitizeApiCardResult(item.Result1);
+  }
+
+  return {
+    resultDate: current.resultDate,
+    result: current.result,
+    previousDate,
+    previousResult,
+  };
+}
+
 function resolveFeaturedResultFromRecent(item: RecentResultItem, todayKey = getIstTodayKey()) {
   return resolveTodayResultFromRecent(item, todayKey);
 }
 
-function resolveCardResultFromRecent(item: RecentResultItem) {
-  return {
-    resultDate: item.Date2 ?? item.Date1,
-    result: item.Result2 ?? item.Result1 ?? null,
-  };
-}
-
 function resolveTodayResultFromToday(item: TodayResultItem, todayKey = getIstTodayKey()) {
-  if (item.ResultDate && item.ResultDate !== todayKey) {
-    return {
-      resultDate: todayKey,
-      result: null,
-    };
-  }
-
   return {
-    resultDate: item.ResultDate ?? todayKey,
-    result: item.Result ?? null,
+    resultDate: todayKey,
+    result:
+      item.ResultDate === todayKey || !item.ResultDate
+        ? sanitizeApiCardResult(item.Result)
+        : null,
   };
 }
 
@@ -309,32 +348,123 @@ export function hasResultValue(value: unknown) {
   return Boolean(text) && text !== "XX";
 }
 
-export function buildTodayCardItems(
-  today: TodayResultItem[],
-  recent: RecentResultItem[]
-): TodayResultItem[] {
-  if (today.length) {
-    return today;
-  }
+/** Home / scrapper rows — main slot = IST today result; strip footer = previous day. */
+export function buildScrapperApiCardItems(recent: RecentResultItem[]): TodayResultItem[] {
+  return recent.map((item, index) => {
+    const cardResult = resolveCardDisplayFromRecent(item);
 
-  if (recent.length) {
-    return recent.map((item, index) => {
-      const cardResult = resolveCardResultFromRecent(item);
+    return {
+      ResultId: item.ShiftId ? `recent-${item.ShiftId}` : `recent-${index}`,
+      ShiftId: item.ShiftId,
+      ShiftName: item.ShiftName,
+      ShiftResultTime: item.ShiftResultTime,
+      ShiftColor: item.ShiftColor,
+      ResultDate: cardResult.resultDate,
+      Result: cardResult.result,
+      PreviousDate: cardResult.previousDate,
+      PreviousResult: cardResult.previousResult,
+      AddedDate: item.AddDate,
+    };
+  });
+}
 
+const PRIORITY_STRIP_ORDER = ["disawar", "gali", "faridabad", "shriganesh"];
+
+const PRIORITY_GAME_ALIASES: Record<string, string> = {
+  desawar: "disawar",
+  shreeganesh: "shriganesh",
+};
+
+function resolvePriorityGameKey(name: string | undefined) {
+  const key = normalizeShiftName(name);
+
+  return PRIORITY_GAME_ALIASES[key] ?? key;
+}
+
+export function isPriorityStripGame(name: string | undefined) {
+  return PRIORITY_STRIP_ORDER.includes(resolvePriorityGameKey(name));
+}
+
+function enrichEnvStripsWithRecent(envCards: TodayResultItem[], recent: RecentResultItem[]) {
+  const todayKey = getIstTodayKey();
+  const recentByName = new Map(
+    recent.map((item) => [normalizeShiftName(item.ShiftName), item] as const)
+  );
+
+  return envCards.map((card) => {
+    const match = recentByName.get(normalizeShiftName(card.ShiftName));
+
+    if (!match) {
       return {
-        ResultId: item.ShiftId ? `recent-${item.ShiftId}` : `recent-${index}`,
-        ShiftId: item.ShiftId,
-        ShiftName: item.ShiftName,
-        ShiftResultTime: item.ShiftResultTime,
-        ShiftColor: item.ShiftColor,
-        ResultDate: cardResult.resultDate,
-        Result: cardResult.result,
-        AddedDate: item.AddDate,
+        ...card,
+        ResultDate: todayKey,
       };
-    });
-  }
+    }
 
-  return [];
+    const display = resolveCardDisplayFromRecent(match, todayKey);
+    const envFallback = sanitizeApiCardResult(card.Result);
+
+    return {
+      ...card,
+      ResultDate: display.resultDate,
+      Result: display.result ?? envFallback,
+      PreviousDate: display.previousDate,
+      PreviousResult: display.previousResult,
+    };
+  });
+}
+
+function sortResultStrips(strips: TodayResultItem[]) {
+  const unique = new Map<string, TodayResultItem>();
+
+  strips.forEach((strip) => {
+    const key = normalizeShiftName(strip.ShiftName);
+
+    if (key) {
+      unique.set(key, strip);
+    }
+  });
+
+  const priority = PRIORITY_STRIP_ORDER.map((orderKey) =>
+    [...unique.entries()].find(([key]) => resolvePriorityGameKey(key) === orderKey)
+  )
+    .filter((entry): entry is [string, TodayResultItem] => entry !== undefined)
+    .map(([, strip]) => strip);
+  const rest = [...unique.values()].filter((strip) => !isPriorityStripGame(strip.ShiftName));
+
+  return [...priority, ...rest];
+}
+
+export type HomeDisplayItems = {
+  featured: TodayResultItem;
+  priorityStrips: TodayResultItem[];
+  strips: TodayResultItem[];
+};
+
+export function buildHomeDisplayItems(
+  _today: TodayResultItem[],
+  recent: RecentResultItem[],
+  featured: TodayResultItem | RecentResultItem | null,
+  siteName: string,
+  envCards: TodayResultItem[] = []
+): HomeDisplayItems {
+  const featuredCard = featuredToCardItem(featured, siteName);
+  const envNames = new Set(
+    envCards.map((item) => normalizeShiftName(item.ShiftName)).filter(Boolean)
+  );
+  const apiStrips = buildScrapperApiCardItems(recent).filter(
+    (item) =>
+      !isMiniDesawarName(item.ShiftName) && !envNames.has(normalizeShiftName(item.ShiftName))
+  );
+  const envStrips = enrichEnvStripsWithRecent(envCards, recent);
+
+  const sortedStrips = sortResultStrips([...envStrips, ...apiStrips]);
+
+  return {
+    featured: featuredCard,
+    priorityStrips: sortedStrips.filter((strip) => isPriorityStripGame(strip.ShiftName)),
+    strips: sortedStrips.filter((strip) => !isPriorityStripGame(strip.ShiftName)),
+  };
 }
 
 export function featuredToCardItem(
@@ -379,21 +509,3 @@ export function featuredToCardItem(
   };
 }
 
-export function buildHomeCardItems(
-  today: TodayResultItem[],
-  recent: RecentResultItem[],
-  featured: TodayResultItem | RecentResultItem | null,
-  siteName: string,
-  envCards: TodayResultItem[] = []
-): TodayResultItem[] {
-  const featuredCard = featuredToCardItem(featured, siteName);
-  const envNames = new Set(
-    envCards.map((item) => normalizeShiftName(item.ShiftName)).filter(Boolean)
-  );
-  const apiCards = buildTodayCardItems(today, recent).filter(
-    (item) =>
-      !isMiniDesawarName(item.ShiftName) && !envNames.has(normalizeShiftName(item.ShiftName))
-  );
-
-  return [featuredCard, ...envCards, ...apiCards];
-}

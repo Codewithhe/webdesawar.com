@@ -13,6 +13,8 @@ export type TodayResultItem = {
   ShiftName?: string;
   ShiftResultTime?: string;
   ShiftColor?: string;
+  PreviousResult?: string | number | null;
+  PreviousDate?: string;
 };
 
 export type RecentResultItem = {

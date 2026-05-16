@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
 import JsonLd from "./components/seo/json-ld";
+import WhatsAppFloat from "./components/whatsapp-float";
 import "./globals.css";
 import { rootMetadata } from "./lib/seo/metadata";
 import { createOrganizationSchema, createWebSiteSchema } from "./lib/seo/schema";
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body className={inter.variable}>
         <JsonLd data={[createWebSiteSchema(), createOrganizationSchema()]} />
         {children}
+        <WhatsAppFloat />
       </body>
     </html>
   );

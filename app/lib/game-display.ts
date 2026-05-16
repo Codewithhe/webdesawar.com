@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 
 import { isMiniDesawarName, normalizeShiftName } from "./result-display";
-import { SITE_NAME } from "./site";
 
 type GamePresentation = {
   hindi: string;
@@ -16,7 +15,145 @@ const DEFAULT_PRESENTATION: GamePresentation = {
   shadow: "rgba(255, 43, 43, 0.22)",
 };
 
+const PRESENTATION_ALIASES: Record<string, string> = {
+  desawar: "disawar",
+  olddesawar: "olddesawar",
+  galidisawarmix: "gali",
+  chotigali: "gali",
+  newgali: "gali",
+  galibazar: "gali",
+  newghaziabad: "ghaziabad",
+  ghaziabaddin: "ghaziabad",
+  ghaziabadnight: "ghaziabad",
+  shriganesh: "shriganesh",
+  shreeganesh: "shriganesh",
+  faridabazar: "faridabad",
+};
+
+const TOKEN_HINDI: Record<string, string> = {
+  "1": "1",
+  agra: "आगरा",
+  ahmedabad: "अहमदाबाद",
+  al: "अल",
+  anarkali: "अनारकली",
+  bala: "बाला",
+  bangalore: "बैंगलोर",
+  bazaar: "बाज़ार",
+  bazar: "बाज़ार",
+  bhagwati: "भगवती",
+  bharat: "भारत",
+  bihar: "बिहार",
+  bikaner: "बीकानेर",
+  bk: "बीके",
+  bombay: "बॉम्बे",
+  brij: "बृज",
+  burj: "बुर्ज",
+  challenge: "चैलेंज",
+  chand: "चाँद",
+  chennai: "चेन्नई",
+  choti: "छोटी",
+  city: "सिटी",
+  dadri: "दादरी",
+  deep: "दीप",
+  dehradun: "देहरादून",
+  delhi: "दिल्ली",
+  desawar: "दिसावर",
+  dhan: "धन",
+  din: "दिन",
+  disawar: "दिसावर",
+  dream: "ड्रीम",
+  ds: "डीएस",
+  dubai: "दुबई",
+  e: "ए",
+  evening: "इवनिंग",
+  express: "एक्सप्रेस",
+  farida: "फरीदा",
+  faridabad: "फरीदाबाद",
+  gali: "गली",
+  ganesh: "गणेश",
+  ganga: "गंगा",
+  ghaziabad: "गाज़ियाबाद",
+  gold: "गोल्ड",
+  golden: "गोल्डन",
+  gurgaon: "गुड़गांव",
+  guru: "गुरु",
+  hindustan: "हिंदुस्तान",
+  india: "इंडिया",
+  jaipur: "जयपुर",
+  jaisalmer: "जैसलमेर",
+  jalandhar: "जालंधर",
+  janta: "जनता",
+  ji: "जी",
+  ka: "का",
+  kalka: "कालका",
+  khalifa: "खलीफा",
+  king: "किंग",
+  kuber: "कुबेर",
+  laxmi: "लक्ष्मी",
+  ludhiana: "लुधियाना",
+  maa: "माँ",
+  mahalaxmi: "महालक्ष्मी",
+  maharaj: "महाराज",
+  malik: "मलिक",
+  mangal: "मंगल",
+  matka: "मटका",
+  max: "मैक्स",
+  meerut: "मेरठ",
+  mix: "मिक्स",
+  mohali: "मोहाली",
+  mumbai: "मुंबई",
+  nagar: "नगर",
+  nagpur: "नागपुर",
+  neelkanth: "नीलकंठ",
+  new: "नया",
+  night: "नाइट",
+  noida: "नोएडा",
+  number: "नंबर",
+  old: "पुराना",
+  p: "पी",
+  palwal: "पलवल",
+  paras: "पारस",
+  punjab: "पंजाब",
+  rahat: "राहत",
+  rajdhani: "राजधानी",
+  rani: "रानी",
+  royal: "रॉयल",
+  rozana: "रोज़ाना",
+  sagar: "सागर",
+  sahibabad: "साहिबाबाद",
+  savera: "सवेरा",
+  sawariya: "सावरिया",
+  seth: "सेठ",
+  shaan: "शान",
+  shakti: "शक्ति",
+  shankar: "शंकर",
+  shiv: "शिव",
+  shree: "श्री",
+  shri: "श्री",
+  sone: "सोने",
+  star: "स्टार",
+  super: "सुपर",
+  taj: "ताज",
+  tara: "तारा",
+  today: "टुडे",
+  u: "यू",
+  udaan: "उड़ान",
+  ujala: "उजाला",
+  uk: "यूके",
+  up: "यूपी",
+  uttarakhand: "उत्तराखंड",
+  veera: "वीरा",
+  waheguru: "वाहेगुरु",
+  white: "व्हाइट",
+};
+
 const GAME_PRESENTATION: Record<string, GamePresentation> = {
+  minidesawar: {
+    hindi: "मिनी दिसावर",
+    background:
+      "radial-gradient(circle at 50% 0%, rgba(255, 214, 79, 0.34), transparent 42%), linear-gradient(145deg, rgba(255, 109, 26, 0.26), rgba(39, 104, 240, 0.18))",
+    shadow: "rgba(255, 214, 79, 0.28)",
+  },
   faridabad: {
     hindi: "फरीदाबाद",
     background:
@@ -38,8 +175,14 @@ const GAME_PRESENTATION: Record<string, GamePresentation> = {
   disawar: {
     hindi: "दिसावर",
     background:
-      "radial-gradient(circle at 50% 0%, rgba(255, 92, 138, 0.3), transparent 44%), linear-gradient(145deg, rgba(168, 24, 72, 0.72), rgba(74, 10, 36, 0.92))",
-    shadow: "rgba(255, 92, 138, 0.26)",
+      "radial-gradient(circle at 50% 0%, rgba(255, 214, 120, 0.38), transparent 44%), linear-gradient(145deg, rgba(168, 98, 8, 0.92), rgba(62, 38, 4, 0.96))",
+    shadow: "rgba(255, 196, 67, 0.32)",
+  },
+  olddesawar: {
+    hindi: "पुराना दिसावर",
+    background:
+      "radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.32), transparent 44%), linear-gradient(145deg, rgba(120, 82, 10, 0.9), rgba(48, 32, 4, 0.95))",
+    shadow: "rgba(212, 175, 55, 0.28)",
   },
   delhinoon: {
     hindi: "दिल्ली नून",
@@ -97,20 +240,49 @@ const GAME_PRESENTATION: Record<string, GamePresentation> = {
   },
 };
 
-function getPresentation(shiftName: string | undefined) {
+export function resolveGameKey(shiftName: string | undefined) {
   const key = normalizeShiftName(shiftName);
+
+  return PRESENTATION_ALIASES[key] ?? key;
+}
+
+function tokenizeGameName(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function buildHindiFromTokens(name: string) {
+  const tokens = tokenizeGameName(name);
+
+  if (!tokens.length) {
+    return "रिज़ल्ट";
+  }
+
+  return tokens.map((token) => TOKEN_HINDI[token] ?? token.toUpperCase()).join(" ");
+}
+
+function getPresentation(shiftName: string | undefined) {
+  const key = resolveGameKey(shiftName);
 
   return GAME_PRESENTATION[key] ?? DEFAULT_PRESENTATION;
 }
 
 export function getGameCardLabel(shiftName: string | undefined, featured = false) {
   if (featured || isMiniDesawarName(shiftName)) {
-    return shiftName || SITE_NAME;
+    return getPresentation(shiftName).hindi || "मिनी दिसावर";
   }
 
   const presentation = getPresentation(shiftName);
 
-  return presentation.hindi || shiftName || "रिज़ल्ट";
+  if (presentation.hindi) {
+    return presentation.hindi;
+  }
+
+  return buildHindiFromTokens(shiftName || "") || shiftName || "रिज़ल्ट";
 }
 
 export function getGameCardStyle(
@@ -129,6 +301,28 @@ export function getGameCardStyle(
   };
 }
 
-export function getGameCardLabelClassName(featured = false) {
-  return featured ? "today-card-label" : "today-card-label today-card-label-hindi";
+export function getGameCardLabelClassName() {
+  return "today-card-label today-card-label-hindi";
+}
+
+export function isDesawarStripGame(name: string | undefined) {
+  const key = resolveGameKey(name);
+
+  return key === "disawar" || key === "olddesawar";
+}
+
+export function getStripClassName(shiftName: string | undefined, isLive: boolean, isPriority: boolean) {
+  const classes = ["result-strip"];
+
+  if (isPriority) {
+    classes.push("is-priority");
+  }
+
+  if (isDesawarStripGame(shiftName)) {
+    classes.push("is-desawar");
+  }
+
+  classes.push(isLive ? "is-live" : "is-waiting");
+
+  return classes.join(" ");
 }
