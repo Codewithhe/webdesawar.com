@@ -206,6 +206,7 @@ h2 {
 
 .clock-card strong {
   color: var(--gold-bright);
+  color: var(--gold-bright);
   font-size: clamp(2.75rem, 8vw, 4.75rem);
   letter-spacing: -0.07em;
   margin: 0.6rem 0;
