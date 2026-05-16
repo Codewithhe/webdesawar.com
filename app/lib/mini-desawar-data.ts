@@ -11,10 +11,13 @@ import {
 import {
   flattenResults,
   getRecordCategoryName,
+  hasResult,
+  isVisibleResult,
   normalizeCategory,
   type RawResultRecord,
   type ResultRow,
 } from "./results";
+import { isCanonicalSlotTime } from "./result-time";
 import {
   CATEGORY_NAME,
   DEFAULT_RESULT_TIME,
@@ -26,8 +29,14 @@ type FetchOptions = {
   bypassCache?: boolean;
 };
 
+const MINI_BACKEND_FETCH_TIMEOUT_MS = 8_000;
+
 function getMiniBackendBaseUrl() {
   return process.env.MINIBACKEND_BASE_URL?.trim().replace(/\/$/, "") ?? "";
+}
+
+function getMiniBackendAuthCode() {
+  return process.env.MINIBACKEND_AUTH_CODE?.trim().replace(/^"|"$/g, "") ?? "";
 }
 
 function getPayloadArray(json: unknown) {
@@ -60,10 +69,56 @@ function filterConfiguredCategory(records: RawResultRecord[]) {
   );
 }
 
+function pickCanonicalRowForDate(rows: ResultRow[], dateKey: string): ResultRow | null {
+  const matches = rows.filter((row) => normalizeDateKey(row.date) === dateKey);
+
+  if (!matches.length) {
+    return null;
+  }
+
+  const eveningSlot = matches.find((row) => isCanonicalSlotTime(row.time));
+
+  return eveningSlot ?? matches[matches.length - 1];
+}
+
+function uniqueDateKeys(rows: ResultRow[]) {
+  return [...new Set(rows.map((row) => normalizeDateKey(row.date)).filter(Boolean))].sort((left, right) =>
+    right.localeCompare(left)
+  );
+}
+
+function rowsByDateDescending(rows: ResultRow[]) {
+  return uniqueDateKeys(rows)
+    .map((dateKey) => pickCanonicalRowForDate(rows, dateKey))
+    .filter((row): row is ResultRow => row !== null);
+}
+
+function withEveningReleaseTime(row: ResultRow): ResultRow {
+  return {
+    ...row,
+    time: DEFAULT_RESULT_TIME,
+  };
+}
+
+function visibleNumber(row: ResultRow | null, now = new Date()) {
+  if (!row || !hasResult(row)) {
+    return null;
+  }
+
+  return isVisibleResult(withEveningReleaseTime(row), now) ? row.number : null;
+}
+
+function mergeChartDates(scrapperDates: string[], rows: ResultRow[]) {
+  return [...new Set([...scrapperDates, ...uniqueDateKeys(rows)])].sort((left, right) =>
+    right.localeCompare(left)
+  );
+}
+
 async function fetchMiniDesawarRows({ bypassCache = false }: FetchOptions = {}) {
   const baseUrl = getMiniBackendBaseUrl();
+  const authCode = getMiniBackendAuthCode();
 
-  if (!baseUrl) {
+  if (!baseUrl || !authCode) {
     return [];
   }
 
@@ -71,46 +126,46 @@ async function fetchMiniDesawarRows({ bypassCache = false }: FetchOptions = {}) 
     ? { cache: "no-store" }
     : { next: { revalidate: RESULTS_REVALIDATE_SECONDS } };
 
-  const response = await fetch(`${baseUrl}/api/fetch-result-direct`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      "X-App-Version": process.env.APP_VERSION || "2.0.3",
-      "x-app-source": "mobile",
-      "x-platform": "web",
-    },
-    ...fetchOptions,
-  });
+  try {
+    const response = await fetch(`${baseUrl}/api/fetch-result`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authCode}`,
+        "X-App-Version": process.env.APP_VERSION || "2.0.3",
+        "x-app-source": "mobile",
+        "x-platform": "web",
+      },
+      signal: AbortSignal.timeout(MINI_BACKEND_FETCH_TIMEOUT_MS),
+      ...fetchOptions,
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      return [];
+    }
+
+    const text = await response.text();
+    const json = text ? (JSON.parse(text) as unknown) : {};
+
+    return flattenResults(
+      filterConfiguredCategory(
+        getPayloadArray(json).filter(
+          (record): record is RawResultRecord => !!record && typeof record === "object"
+        )
+      )
+    );
+  } catch {
     return [];
   }
-
-  const text = await response.text();
-  const json = text ? (JSON.parse(text) as unknown) : {};
-
-  return flattenResults(
-    filterConfiguredCategory(
-      getPayloadArray(json).filter(
-        (record): record is RawResultRecord => !!record && typeof record === "object"
-      )
-    )
-  );
-}
-
-function sortRowsByDate(rows: ResultRow[]) {
-  return [...rows].sort((left, right) =>
-    normalizeDateKey(right.date).localeCompare(normalizeDateKey(left.date))
-  );
 }
 
 export function withoutScrapperMiniDesawarRows<T extends { ShiftName?: string }>(items: T[]) {
   return items.filter((item) => !isMiniDesawarName(item.ShiftName));
 }
 
-export function mapMiniDesawarFeaturedRow(rows: ResultRow[]): TodayResultItem | null {
+export function mapMiniDesawarFeaturedRow(rows: ResultRow[], now = new Date()): TodayResultItem | null {
   const todayKey = getIstTodayKey();
-  const todayRow = rows.find((row) => normalizeDateKey(row.date) === todayKey);
+  const todayRow = pickCanonicalRowForDate(rows, todayKey);
 
   if (!todayRow) {
     return null;
@@ -119,46 +174,50 @@ export function mapMiniDesawarFeaturedRow(rows: ResultRow[]): TodayResultItem | 
   return {
     ResultId: todayRow.id ?? "featured",
     ShiftName: SITE_NAME,
-    ShiftResultTime: todayRow.time || DEFAULT_RESULT_TIME,
+    ShiftResultTime: DEFAULT_RESULT_TIME,
     ResultDate: todayKey,
-    Result: todayRow.number ?? null,
+    Result: visibleNumber(todayRow, now),
   };
 }
 
-export function mapMiniDesawarRecentRow(rows: ResultRow[]): RecentResultItem | null {
+export function mapMiniDesawarRecentRow(rows: ResultRow[], now = new Date()): RecentResultItem | null {
   if (!rows.length) {
     return null;
   }
 
-  const sorted = sortRowsByDate(rows);
+  const sorted = rowsByDateDescending(rows);
   const latest = sorted[0];
   const previous = sorted[1];
 
   return {
     ShiftName: SITE_NAME,
-    ShiftResultTime: latest.time || DEFAULT_RESULT_TIME,
+    ShiftResultTime: DEFAULT_RESULT_TIME,
     Date1: previous ? normalizeDateKey(previous.date) : undefined,
-    Result1: previous?.number ?? null,
+    Result1: visibleNumber(previous ?? null, now),
     Date2: latest ? normalizeDateKey(latest.date) : undefined,
-    Result2: latest?.number ?? null,
+    Result2: visibleNumber(latest ?? null, now),
   };
 }
 
-export function mapMiniDesawarWeekRow(rows: ResultRow[], dates: string[]): WeekPivotRow | null {
-  if (!dates.length) {
+export function mapMiniDesawarWeekRow(
+  rows: ResultRow[],
+  dates: string[],
+  now = new Date()
+): WeekPivotRow | null {
+  const chartDates = mergeChartDates(dates, rows);
+
+  if (!chartDates.length) {
     return null;
   }
 
-  const latest = sortRowsByDate(rows)[0];
-
   return {
     name: SITE_NAME,
-    time: latest?.time || DEFAULT_RESULT_TIME,
+    time: DEFAULT_RESULT_TIME,
     values: Object.fromEntries(
-      dates.map((date) => {
-        const match = rows.find((row) => normalizeDateKey(row.date) === date);
+      chartDates.map((date) => {
+        const match = pickCanonicalRowForDate(rows, date);
 
-        return [date, displayResult(match?.number)];
+        return [date, displayResult(visibleNumber(match, now))];
       })
     ),
   };
@@ -199,21 +258,29 @@ export function mergeWeekPivotWithMiniDesawar(
   weekPivot: { dates: string[]; rows: WeekPivotRow[] },
   miniWeekRow: WeekPivotRow | null
 ) {
-  const row = miniWeekRow ?? buildFallbackWeekRow(weekPivot.dates);
+  const dates = miniWeekRow
+    ? [...new Set([...weekPivot.dates, ...Object.keys(miniWeekRow.values)])].sort((left, right) =>
+        right.localeCompare(left)
+      )
+    : weekPivot.dates;
+  const row = miniWeekRow ?? buildFallbackWeekRow(dates);
   const filtered = weekPivot.rows.filter((item) => !isMiniDesawarName(item.name));
 
   return {
-    dates: weekPivot.dates,
+    dates,
     rows: [row, ...filtered],
   };
 }
 
 export async function getMiniDesawarData(dates: string[], options: FetchOptions = {}) {
   const rows = await fetchMiniDesawarRows(options);
+  const now = new Date();
+  const week = mapMiniDesawarWeekRow(rows, dates, now);
 
   return {
-    featured: mapMiniDesawarFeaturedRow(rows),
-    recent: mapMiniDesawarRecentRow(rows),
-    week: mapMiniDesawarWeekRow(rows, dates),
+    featured: mapMiniDesawarFeaturedRow(rows, now),
+    recent: mapMiniDesawarRecentRow(rows, now),
+    week,
+    weekDates: week ? Object.keys(week.values).sort((left, right) => right.localeCompare(left)) : [],
   };
 }

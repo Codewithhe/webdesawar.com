@@ -75,7 +75,13 @@ export default function ResultsWebsite({
   refreshAction,
 }: ResultsWebsiteProps) {
   const siteName = SITE_NAME;
-  const homeCards = buildHomeCardItems(data.today, data.sourceRecent, data.featured, siteName);
+  const homeCards = buildHomeCardItems(
+    data.today,
+    data.sourceRecent,
+    data.featured,
+    siteName,
+    data.envCards
+  );
 
   if (chartOnly) {
     return (

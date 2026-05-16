@@ -7,7 +7,13 @@ import {
   mergeWeekPivotWithMiniDesawar,
   withoutScrapperMiniDesawarRows,
 } from "./mini-desawar-data";
-import { getLatestTimestamp, buildWeekPivotRows, type WeekPivotRow } from "./result-display";
+import { buildEnvGameCardItems } from "./env-game-cards";
+import {
+  buildWeekPivotRows,
+  findFeaturedTodayResult,
+  getLatestTimestamp,
+  type WeekPivotRow,
+} from "./result-display";
 import type { RecentResultItem, TodayResultItem, WeekResultItem } from "./api";
 
 type FetchOptions = {
@@ -31,71 +37,76 @@ export type ResultsData = {
     rows: WeekPivotRow[];
   };
   featured: TodayResultItem | RecentResultItem | null;
+  envCards: TodayResultItem[];
   lastUpdated: string | null;
   status: ResultsStatus;
 };
 
+function buildResultsFromLatest(
+  response: Extract<Awaited<ReturnType<typeof fetchLatestResults>>, { success: true }>,
+  miniDesawar: Awaited<ReturnType<typeof getMiniDesawarData>>,
+  bypassCache: boolean
+): ResultsData {
+  const buckets = response.data.data;
+  const today = withoutScrapperMiniDesawarRows(buckets.Today);
+  const sourceRecent = withoutScrapperMiniDesawarRows(buckets.Recent);
+  const week = buckets.WeekResult;
+  const weekPivot = buildWeekPivotRows(week);
+
+  return {
+    success: true,
+    cached: response.cached,
+    today,
+    sourceRecent,
+    recent: mergeRecentWithMiniDesawar(sourceRecent, miniDesawar.recent),
+    week,
+    weekPivot: mergeWeekPivotWithMiniDesawar(weekPivot, miniDesawar.week),
+    featured: miniDesawar.featured ?? findFeaturedTodayResult(buckets.Today, buckets.Recent),
+    envCards: buildEnvGameCardItems(),
+    lastUpdated: getLatestTimestamp(today, sourceRecent, week),
+    status: {
+      type: "success",
+      message: bypassCache
+        ? "Fresh live results loaded from the API."
+        : "Live results loaded from the API.",
+    },
+  };
+}
+
 export async function getResultsData({ bypassCache = false }: FetchOptions = {}): Promise<ResultsData> {
-  try {
-    const response = await fetchLatestResults({ bypassCache });
+  const response = await fetchLatestResults({ bypassCache });
 
-    if (!response.success) {
-      return {
-        success: false,
-        cached: response.cached,
-        today: [],
-        sourceRecent: [],
-        recent: [],
-        week: [],
-        weekPivot: { dates: [], rows: [] },
-        featured: null,
-        lastUpdated: null,
-        status: {
-          type: "error",
-          message: response.message || "Unable to load live results right now.",
-        },
-      };
-    }
-
-    const buckets = response.data.data;
-    const today = withoutScrapperMiniDesawarRows(buckets.Today);
-    const sourceRecent = withoutScrapperMiniDesawarRows(buckets.Recent);
-    const week = buckets.WeekResult;
-    const weekPivot = buildWeekPivotRows(week);
-    const miniDesawar = await getMiniDesawarData(weekPivot.dates, { bypassCache });
-
-    return {
-      success: true,
-      cached: response.cached,
-      today,
-      sourceRecent,
-      recent: mergeRecentWithMiniDesawar(sourceRecent, miniDesawar.recent),
-      week,
-      weekPivot: mergeWeekPivotWithMiniDesawar(weekPivot, miniDesawar.week),
-      featured: miniDesawar.featured,
-      lastUpdated: getLatestTimestamp(today, sourceRecent, week),
-      status: {
-        type: "success",
-        message: bypassCache
-          ? "Fresh live results loaded from the API."
-          : "Live results loaded from the API.",
-      },
-    };
-  } catch (error) {
+  if (!response.success) {
     return {
       success: false,
-      cached: false,
+      cached: response.cached,
       today: [],
       sourceRecent: [],
       recent: [],
       week: [],
       weekPivot: { dates: [], rows: [] },
       featured: null,
+      envCards: buildEnvGameCardItems(),
       lastUpdated: null,
       status: {
         type: "error",
-        message: error instanceof Error ? error.message : "Failed to load results",
+        message: response.message || "Unable to load live results right now.",
       },
     };
   }
+
+  const weekPivot = buildWeekPivotRows(response.data.data.WeekResult);
+  let miniDesawar: Awaited<ReturnType<typeof getMiniDesawarData>> = {
+    featured: null,
+    recent: null,
+    week: null,
+  };
+
+  try {
+    miniDesawar = await getMiniDesawarData(weekPivot.dates, { bypassCache });
+  } catch {
+    // Mini backend must not block scrapper /api/latest results from rendering.
+  }
+
+  return buildResultsFromLatest(response, miniDesawar, bypassCache);
 }

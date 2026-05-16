@@ -110,6 +110,8 @@ function normalizeBuckets(payload: unknown): LatestResultBuckets {
   };
 }
 
+const LATEST_RESULTS_FETCH_TIMEOUT_MS = 12_000;
+
 export async function fetchLatestResults({
   bypassCache = false,
 }: FetchLatestOptions = {}): Promise<LatestApiResponse> {
@@ -117,29 +119,40 @@ export async function fetchLatestResults({
     ? { cache: "no-store" }
     : { next: { revalidate: RESULTS_REVALIDATE_SECONDS } };
 
-  const response = await fetch(`${getApiBaseUrl()}/api/latest`, fetchOptions);
-  const text = await response.text();
-  const json = text ? (JSON.parse(text) as LatestApiResponse) : null;
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/api/latest`, {
+      ...fetchOptions,
+      signal: AbortSignal.timeout(LATEST_RESULTS_FETCH_TIMEOUT_MS),
+    });
+    const text = await response.text();
+    const json = text ? (JSON.parse(text) as LatestApiResponse) : null;
 
-  if (!response.ok || !json) {
+    if (!response.ok || !json) {
+      return {
+        success: false,
+        cached: false,
+        message: "Unable to load live results right now.",
+      };
+    }
+
+    if (!json.success) {
+      return json;
+    }
+
+    return {
+      success: true,
+      cached: Boolean(json.cached),
+      data: {
+        status: Boolean(json.data?.status),
+        message: String(json.data?.message ?? "Result list!"),
+        data: normalizeBuckets(json.data?.data),
+      },
+    };
+  } catch {
     return {
       success: false,
       cached: false,
       message: "Unable to load live results right now.",
     };
   }
-
-  if (!json.success) {
-    return json;
-  }
-
-  return {
-    success: true,
-    cached: Boolean(json.cached),
-    data: {
-      status: Boolean(json.data?.status),
-      message: String(json.data?.message ?? "Result list!"),
-      data: normalizeBuckets(json.data?.data),
-    },
-  };
 }

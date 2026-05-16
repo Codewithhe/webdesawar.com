@@ -1023,9 +1023,23 @@ a {
 
 .today-card-label {
   color: #ffd64f;
+  font-size: clamp(0.95rem, 3.8vw, 1.12rem);
   letter-spacing: 0.06em;
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
   text-transform: uppercase;
+}
+
+.today-card-label-hindi {
+  color: #ff2b2b;
+  font-size: clamp(1.12rem, 4.8vw, 1.38rem);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  margin-top: 0.25rem;
+  text-shadow:
+    0 0 14px rgba(255, 43, 43, 0.42),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+  text-transform: none;
 }
 
 .today-card strong {

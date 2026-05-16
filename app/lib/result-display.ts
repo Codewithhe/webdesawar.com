@@ -1,4 +1,4 @@
-import { CATEGORY_NAME, DEFAULT_RESULT_TIME, OTHER_GAME_PLACEHOLDERS, RESULT_TIME_ZONE, SITE_NAME } from "./site";
+import { CATEGORY_NAME, DEFAULT_RESULT_TIME, RESULT_TIME_ZONE, SITE_NAME } from "./site";
 import type { RecentResultItem, TodayResultItem, WeekResultItem } from "./api";
 
 export type WeekPivotRow = {
@@ -334,13 +334,7 @@ export function buildTodayCardItems(
     });
   }
 
-  return OTHER_GAME_PLACEHOLDERS.map((game, index) => ({
-    ResultId: `placeholder-${index}`,
-    ShiftId: String(index + 1),
-    ShiftName: game.name,
-    ShiftResultTime: game.time,
-    Result: null,
-  } satisfies TodayResultItem));
+  return [];
 }
 
 export function featuredToCardItem(
@@ -389,12 +383,17 @@ export function buildHomeCardItems(
   today: TodayResultItem[],
   recent: RecentResultItem[],
   featured: TodayResultItem | RecentResultItem | null,
-  siteName: string
+  siteName: string,
+  envCards: TodayResultItem[] = []
 ): TodayResultItem[] {
   const featuredCard = featuredToCardItem(featured, siteName);
-  const otherCards = buildTodayCardItems(today, recent).filter(
-    (item) => !isMiniDesawarName(item.ShiftName)
+  const envNames = new Set(
+    envCards.map((item) => normalizeShiftName(item.ShiftName)).filter(Boolean)
+  );
+  const apiCards = buildTodayCardItems(today, recent).filter(
+    (item) =>
+      !isMiniDesawarName(item.ShiftName) && !envNames.has(normalizeShiftName(item.ShiftName))
   );
 
-  return [featuredCard, ...otherCards];
+  return [featuredCard, ...envCards, ...apiCards];
 }

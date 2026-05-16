@@ -1,4 +1,9 @@
 import {
+  getGameCardLabel,
+  getGameCardLabelClassName,
+  getGameCardStyle,
+} from "../lib/game-display";
+import {
   displayResult,
   formatResultTime,
   formatShortDate,
@@ -12,12 +17,17 @@ type ResultCardProps = {
 };
 
 export default function ResultCard({ item, featured = false }: ResultCardProps) {
+  const resultText = displayResult(item.Result);
   const isLive = hasResultValue(item.Result);
-  const resultLabel = isLive ? displayResult(item.Result) : "Waiting";
-  const gameName = item.ShiftName || "Result";
+  const resultLabel = isLive ? resultText : resultText === "XX" ? "XX" : "Waiting";
+  const gameName = getGameCardLabel(item.ShiftName, featured);
+  const cardStyle = getGameCardStyle(item.ShiftName, featured);
 
   return (
-    <article className={`today-card ${isLive ? "is-live" : "is-waiting"}${featured ? " featured-card" : ""}`}>
+    <article
+      className={`today-card ${isLive ? "is-live" : "is-waiting"}${featured ? " featured-card" : ""}`}
+      style={cardStyle}
+    >
       <div className="today-card-top">
         {featured ? (
           <span className={`live-chip${isLive ? " is-blinking is-red-live" : ""}`}>
@@ -27,7 +37,7 @@ export default function ResultCard({ item, featured = false }: ResultCardProps) 
         <span className="time-chip">{formatResultTime(item.ShiftResultTime)}</span>
       </div>
       <strong className={isLive ? "result" : "waiting"}>{resultLabel}</strong>
-      <span className="today-card-label">{gameName}</span>
+      <span className={getGameCardLabelClassName(featured)}>{gameName}</span>
       <span className="date-badge">{formatShortDate(item.ResultDate)}</span>
     </article>
   );

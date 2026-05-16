@@ -23,9 +23,3 @@ export const CATEGORY_NAME = process.env.CATEGORY_NAME ?? "Minidesawer";
 export const WHATSAPP_PHONE = "919389187889";
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_PHONE}`;
 
-export const OTHER_GAME_PLACEHOLDERS = [
-  { name: "Faridabad", time: "06:00 PM" },
-  { name: "Ghaziabad", time: "09:25 PM" },
-  { name: "Gali", time: "11:25 PM" },
-  { name: "Disawar", time: "05:00 AM" },
-] as const;
