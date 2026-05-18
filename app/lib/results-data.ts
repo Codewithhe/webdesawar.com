@@ -8,7 +8,6 @@ import {
   mergeWeekPivotWithMiniDesawar,
   withoutScrapperMiniDesawarRows,
 } from "./mini-desawar-data";
-import { buildEnvGameCardItems } from "./env-game-cards";
 import {
   buildWeekPivotRows,
   findFeaturedTodayResult,
@@ -38,7 +37,6 @@ export type ResultsData = {
     rows: WeekPivotRow[];
   };
   featured: TodayResultItem | RecentResultItem | null;
-  envCards: TodayResultItem[];
   lastUpdated: string | null;
   status: ResultsStatus;
 };
@@ -68,7 +66,6 @@ function buildResultsFromLatest(
     week,
     weekPivot: mergeWeekPivotWithMiniDesawar(weekPivot, miniDesawar.week),
     featured: miniDesawar.featured ?? findFeaturedTodayResult(buckets.Today, buckets.Recent),
-    envCards: buildEnvGameCardItems(),
     lastUpdated: getLatestTimestamp(today, sourceRecent, week),
     status: {
       type: "success",
@@ -95,7 +92,6 @@ function buildResultsFromHomeDataOnly(
     week: [],
     weekPivot: mergeWeekPivotWithMiniDesawar({ dates: [], rows: [] }, miniDesawar.week),
     featured: miniDesawar.featured,
-    envCards: buildEnvGameCardItems(),
     lastUpdated: homeData.updatedAt,
     status: {
       type: "success",
@@ -146,7 +142,6 @@ export async function getResultsData({ bypassCache = false }: FetchOptions = {})
     week: [],
     weekPivot: { dates: [], rows: [] },
     featured: null,
-    envCards: buildEnvGameCardItems(),
     lastUpdated: null,
     status: {
       type: "error",

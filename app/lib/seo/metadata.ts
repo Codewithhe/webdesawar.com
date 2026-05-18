@@ -50,19 +50,21 @@ export function createPageMetadata({
   noIndex = false,
 }: PageMetadataOptions): Metadata {
   const canonicalPath = path.startsWith("/") ? path : `/${path}`;
+  const canonicalUrl = absoluteUrl(canonicalPath);
   const openGraphImages = [{ ...DEFAULT_OG_IMAGE, alt: title }];
+  const twitterImageUrl = absoluteUrl(DEFAULT_OG_IMAGE.url);
 
   return {
     title,
     description,
     keywords,
     alternates: {
-      canonical: canonicalPath,
+      canonical: canonicalUrl,
     },
     openGraph: {
       title,
       description,
-      url: canonicalPath,
+      url: canonicalUrl,
       siteName: SITE_NAME,
       locale: "en_IN",
       type: "website",
@@ -72,7 +74,7 @@ export function createPageMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: [DEFAULT_OG_IMAGE.url],
+      images: [twitterImageUrl],
     },
     robots: noIndex
       ? {
@@ -103,7 +105,7 @@ export const rootMetadata: Metadata = {
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    url: "/",
+    url: absoluteUrl("/"),
     siteName: SITE_NAME,
     locale: "en_IN",
     type: "website",
@@ -113,7 +115,7 @@ export const rootMetadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: [DEFAULT_OG_IMAGE.url],
+    images: [absoluteUrl(DEFAULT_OG_IMAGE.url)],
   },
   robots: DEFAULT_ROBOTS,
 };

@@ -385,35 +385,6 @@ export function isPriorityStripGame(name: string | undefined) {
   return PRIORITY_STRIP_ORDER.includes(resolvePriorityGameKey(name));
 }
 
-function enrichEnvStripsWithRecent(envCards: TodayResultItem[], recent: RecentResultItem[]) {
-  const todayKey = getIstTodayKey();
-  const recentByName = new Map(
-    recent.map((item) => [normalizeShiftName(item.ShiftName), item] as const)
-  );
-
-  return envCards.map((card) => {
-    const match = recentByName.get(normalizeShiftName(card.ShiftName));
-
-    if (!match) {
-      return {
-        ...card,
-        ResultDate: todayKey,
-      };
-    }
-
-    const display = resolveCardDisplayFromRecent(match, todayKey);
-    const envFallback = sanitizeApiCardResult(card.Result);
-
-    return {
-      ...card,
-      ResultDate: display.resultDate,
-      Result: display.result ?? envFallback,
-      PreviousDate: display.previousDate,
-      PreviousResult: display.previousResult,
-    };
-  });
-}
-
 function sortResultStrips(strips: TodayResultItem[]) {
   const unique = new Map<string, TodayResultItem>();
 
@@ -445,20 +416,14 @@ export function buildHomeDisplayItems(
   _today: TodayResultItem[],
   recent: RecentResultItem[],
   featured: TodayResultItem | RecentResultItem | null,
-  siteName: string,
-  envCards: TodayResultItem[] = []
+  siteName: string
 ): HomeDisplayItems {
   const featuredCard = featuredToCardItem(featured, siteName);
-  const envNames = new Set(
-    envCards.map((item) => normalizeShiftName(item.ShiftName)).filter(Boolean)
-  );
   const apiStrips = buildScrapperApiCardItems(recent).filter(
-    (item) =>
-      !isMiniDesawarName(item.ShiftName) && !envNames.has(normalizeShiftName(item.ShiftName))
+    (item) => !isMiniDesawarName(item.ShiftName)
   );
-  const envStrips = enrichEnvStripsWithRecent(envCards, recent);
 
-  const sortedStrips = sortResultStrips([...envStrips, ...apiStrips]);
+  const sortedStrips = sortResultStrips(apiStrips);
 
   return {
     featured: featuredCard,

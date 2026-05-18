@@ -5,6 +5,11 @@ export const PUBLIC_ROUTES = [
     priority: 1,
   },
   {
+    path: "/results",
+    changeFrequency: "daily" as const,
+    priority: 0.9,
+  },
+  {
     path: "/month-chart",
     changeFrequency: "daily" as const,
     priority: 0.8,

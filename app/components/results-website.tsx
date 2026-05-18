@@ -82,8 +82,7 @@ export default function ResultsWebsite({
     data.today,
     data.sourceRecent,
     data.featured,
-    siteName,
-    data.envCards
+    siteName
   );
 
   if (chartOnly) {
